@@ -1,0 +1,30 @@
+{
+  "name": "react-learn",
+  "version": "0.0.1",
+  "authors": [
+    "hopefuture <linder0209@126.com>"
+  ],
+  "description": "This app is an example for React.",
+  "keywords": [
+    "React"
+  ],
+  "private": true,
+  "dependencies": {
+    "jquery": "~2.1.4",
+    "modernizr": "~2.8.1",
+    "normalize.css": "~3.0.3"
+  },
+  "devDependencies": {
+    "bootstrap": "~3.3.5",
+    "bootstrap4": "git@github.com:twbs/bootstrap.git#v4.0.0-alpha"
+  },
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "dist",
+    "node_modules",
+    "app/bower_components",
+    "test",
+    ".tmp"
+  ]
+}
