@@ -42,9 +42,9 @@ gulp.task('lint', lint('app/scripts/**/*.js'));
 gulp.task('lint:test', lint('test/spec/**/*.js', testLintOptions));
 
 gulp.task('html', ['styles'], () => {
-  const assets = $.useref.assets({searchPath: ['.tmp', 'app', '.']});
+  const assets = $.useref.assets({searchPath: ['.tmp', 'app', '.', 'app/**']});
 
-  return gulp.src(['app/*.html', 'app/examples/*.html'], {base: 'app'})
+  return gulp.src(['app/examples/*.html'], {base: 'app'})
     .pipe(assets)
     .pipe($.if('*.js', $.uglify()))
     .pipe($.if('*.css', $.minifyCss({compatibility: '*'})))
@@ -89,7 +89,7 @@ gulp.task('extras', () => {
 
 gulp.task('clean', del.bind(null, ['.tmp', 'dist']));
 
-gulp.task('serve', ['styles', 'fonts'], () => {
+gulp.task('serve', ['wiredep', 'styles', 'fonts'], () => {
   browserSync({
     notify: false,
     port: 9000,
@@ -141,6 +141,7 @@ gulp.task('serve:test', () => {
 });
 
 // inject bower components
+// 自动添加 bower js 和 css 包
 gulp.task('wiredep', () => {
   gulp.src('app/sass/*.scss')
     .pipe(wiredep({
@@ -148,18 +149,33 @@ gulp.task('wiredep', () => {
     }))
     .pipe(gulp.dest('app/styles'));
 
-  gulp.src('app/*.html')
+  gulp.src(['app/*.html', 'app/examples/*.html'], {base: 'app'})
     .pipe(wiredep({
-      exclude: [],
+      exclude: ['bower_components/normalize.css/normalize.css', 'bower_components/modernizr/modernizr.js'],
       ignorePath: /^(\.\.\/)*\.\./
     }))
     .pipe(gulp.dest('app'));
 });
 
-gulp.task('build', ['lint', 'html', 'images', 'fonts', 'extras'], () => {
+gulp.task('build', ['wiredep', 'lint', 'html', 'images', 'fonts', 'extras'], () => {
   return gulp.src('dist/**/*').pipe($.size({title: 'build', gzip: true}));
 });
 
 gulp.task('default', ['clean'], () => {
   gulp.start('build');
+});
+
+
+//以下任务是测试例子
+gulp.task('useref-demo', () => {
+  const assets = $.useref.assets({searchPath: ['app/useref-demo']});
+
+  return gulp.src(['app/useref-demo/*.html'], {base: 'app'})
+    .pipe(assets)
+    .pipe($.if('*.js', $.uglify()))
+    .pipe($.if('*.css', $.minifyCss({compatibility: '*'})))
+    .pipe(assets.restore())
+    .pipe($.useref())
+    .pipe($.if('*.html', $.minifyHtml({conditionals: true, loose: true})))
+    .pipe(gulp.dest('dist'));
 });
