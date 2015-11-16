@@ -3,10 +3,12 @@ import gulpLoadPlugins from 'gulp-load-plugins';
 import browserSync from 'browser-sync';
 import del from 'del';
 import {stream as wiredep} from 'wiredep';
+import mainBowerFiles from 'main-bower-files';
 
 const $ = gulpLoadPlugins();
 const reload = browserSync.reload;
 
+//利用sass生成styles任务
 gulp.task('styles', () => {
   return gulp.src('app/sass/*.scss')
     .pipe($.plumber())
@@ -22,11 +24,25 @@ gulp.task('styles', () => {
     .pipe(reload({stream: true}));
 });
 
+//利用gulp-babel 和 babel-preset-react 动态解析 react文件
+gulp.task('presetReact', () => {
+  return gulp.src('app/react-src/**/*.js')
+    .pipe($.babel({
+      //filename: false,
+      //filenameRelative: './',
+      //plugins: ['syntax-jsx'],
+      presets: ['react']
+    }))
+    .pipe($.sourcemaps.init())
+    .pipe(gulp.dest('app/scripts'));
+});
+
+//检测js写法
 function lint(files, options) {
   return () => {
     return gulp.src(files)
       .pipe(reload({stream: true, once: true}))
-      .pipe($.eslint('D:/gitworkspace/eslint-config/es6/.eslintrc'))//配置ESLint文件
+      .pipe($.eslint('D:/gitworkspace/eslint-config/react-es6/.eslintrc'))//配置ESLint文件
       .pipe($.eslint(options))
       .pipe($.eslint.format())
       .pipe($.if(!browserSync.active, $.eslint.failAfterError()));
@@ -38,22 +54,24 @@ const testLintOptions = {
   }
 };
 
-gulp.task('lint', lint('app/scripts/**/*.js'));
+gulp.task('lint:src', lint('app/react-src/**/*.js'));
 gulp.task('lint:test', lint('test/spec/**/*.js', testLintOptions));
 
+//编译替换html中的js和css， build:js 和 build:css 配置，我们用绝对路径
 gulp.task('html', ['styles'], () => {
   const assets = $.useref.assets({searchPath: ['.tmp', 'app', '.', 'app/**']});
 
-  return gulp.src(['app/examples/*.html'], {base: 'app'})
+  return gulp.src(['app/html/**/*.html'], {base: 'app'})
     .pipe(assets)
     .pipe($.if('*.js', $.uglify()))
     .pipe($.if('*.css', $.minifyCss({compatibility: '*'})))
     .pipe(assets.restore())
     .pipe($.useref())
-    //.pipe($.if('*.html', $.minifyHtml({conditionals: true, loose: true})))
+    .pipe($.if('*.html', $.minifyHtml({conditionals: true, loose: true})))
     .pipe(gulp.dest('dist'));
 });
 
+//优化图片
 gulp.task('images', () => {
   return gulp.src('app/images/**/*')
     .pipe($.if($.if.isFile, $.cache($.imagemin({
@@ -70,14 +88,16 @@ gulp.task('images', () => {
     .pipe(gulp.dest('dist/images'));
 });
 
+//如果项目中用到了 fonts 用该任务复制字体到dist
 gulp.task('fonts', () => {
-  return gulp.src(require('main-bower-files')({
+  return gulp.src(mainBowerFiles({
     filter: '**/*.{eot,svg,ttf,woff,woff2}'
   }).concat('app/fonts/**/*'))
     .pipe(gulp.dest('.tmp/fonts'))
     .pipe(gulp.dest('dist/fonts'));
 });
 
+//复制app下其他文件到dist下
 gulp.task('extras', () => {
   return gulp.src([
     'app/*.*',
@@ -87,9 +107,28 @@ gulp.task('extras', () => {
   }).pipe(gulp.dest('dist'));
 });
 
+//清理临时和打包目录
 gulp.task('clean', del.bind(null, ['.tmp', 'dist']));
 
-gulp.task('serve', ['wiredep', 'styles', 'fonts'], () => {
+// inject bower components
+// 自动添加 bower js 和 css 包
+gulp.task('wiredep', () => {
+  /*gulp.src('app/sass/!*.scss')
+   .pipe(wiredep({
+   ignorePath: /^(\.\.\/)+/
+   }))
+   .pipe(gulp.dest('app/styles'));*/
+
+  gulp.src(['app/*.html', 'app/html/**/*.html', 'app/examples/**/*.html'], {base: 'app'})
+    .pipe(wiredep({
+      exclude: ['bower_components/normalize.css/normalize.css', 'bower_components/modernizr/modernizr.js'],
+      ignorePath: /^(\.\.\/)*\.\./
+    }))
+    .pipe(gulp.dest('app'));
+});
+
+//启动服务
+gulp.task('serve', ['wiredep', 'styles', 'fonts', /*'lint:src',*/ 'presetReact'], () => {
   browserSync({
     notify: false,
     port: 9000,
@@ -104,6 +143,7 @@ gulp.task('serve', ['wiredep', 'styles', 'fonts'], () => {
   gulp.watch([
     'app/**/*.html',
     'app/scripts/**/*.js',
+    'app/styles/**/*.css',
     'app/images/**/*',
     '.tmp/fonts/**/*'
   ]).on('change', reload);
@@ -111,8 +151,10 @@ gulp.task('serve', ['wiredep', 'styles', 'fonts'], () => {
   gulp.watch('app/sass/**/*.scss', ['styles']);
   gulp.watch('app/fonts/**/*', ['fonts']);
   gulp.watch('bower.json', ['wiredep', 'fonts']);
+  gulp.watch('app/react-src/**/*.js', ['lint:src', 'presetReact']);
 });
 
+//启动打包后的服务 gulp serve:dist
 gulp.task('serve:dist', () => {
   browserSync({
     notify: false,
@@ -123,6 +165,7 @@ gulp.task('serve:dist', () => {
   });
 });
 
+//启动测试服务 gulp serve:test
 gulp.task('serve:test', () => {
   browserSync({
     notify: false,
@@ -140,42 +183,26 @@ gulp.task('serve:test', () => {
   gulp.watch('test/spec/**/*.js', ['lint:test']);
 });
 
-// inject bower components
-// 自动添加 bower js 和 css 包
-gulp.task('wiredep', () => {
-  gulp.src('app/sass/*.scss')
-    .pipe(wiredep({
-      ignorePath: /^(\.\.\/)+/
-    }))
-    .pipe(gulp.dest('app/styles'));
-
-  gulp.src(['app/*.html', 'app/examples/*.html'], {base: 'app'})
-    .pipe(wiredep({
-      exclude: ['bower_components/normalize.css/normalize.css', 'bower_components/modernizr/modernizr.js'],
-      ignorePath: /^(\.\.\/)*\.\./
-    }))
-    .pipe(gulp.dest('app'));
-});
-
-gulp.task('build', ['wiredep', 'lint', 'html', 'images', 'fonts', 'extras'], () => {
+//打包
+gulp.task('build', ['styles', 'wiredep', 'lint:src', 'html', 'images', 'fonts', 'extras'], () => {
   return gulp.src('dist/**/*').pipe($.size({title: 'build', gzip: true}));
 });
 
+//默认任务
 gulp.task('default', ['clean'], () => {
   gulp.start('build');
 });
 
-
 //以下任务是测试例子
-gulp.task('useref-demo', () => {
+gulp.task('useref-demo', ['clean'], () => {
   const assets = $.useref.assets({searchPath: ['app/useref-demo']});
 
-  return gulp.src(['app/useref-demo/*.html'], {base: 'app'})
+  return gulp.src(['app/useref-demo/**/*.html'], {base: 'app'})
     .pipe(assets)
     .pipe($.if('*.js', $.uglify()))
     .pipe($.if('*.css', $.minifyCss({compatibility: '*'})))
     .pipe(assets.restore())
     .pipe($.useref())
-    .pipe($.if('*.html', $.minifyHtml({conditionals: true, loose: true})))
+    //.pipe($.if('*.html', $.minifyHtml({conditionals: true, loose: true})))
     .pipe(gulp.dest('dist'));
 });
