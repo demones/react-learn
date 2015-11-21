@@ -8,6 +8,8 @@ import mainBowerFiles from 'main-bower-files';
 const $ = gulpLoadPlugins();
 const reload = browserSync.reload;
 
+// 解决gulp不能利用babel正确解决编译es6的问题
+// https://markgoodyear.com/2015/06/using-es6-with-gulp/
 //利用sass生成styles任务
 gulp.task('styles', () => {
   return gulp.src('app/sass/*.scss')
@@ -75,24 +77,24 @@ gulp.task('html', ['styles'], () => {
 gulp.task('images', () => {
   return gulp.src('app/images/**/*')
     .pipe($.if($.if.isFile, $.cache($.imagemin({
-      progressive: true,
-      interlaced: true,
-      // don't remove IDs from SVGs, they are often used
-      // as hooks for embedding and styling
-      svgoPlugins: [{cleanupIDs: false}]
-    }))
-    .on('error', function (err) {
-      console.log(err);
-      this.end();
-    })))
+        progressive: true,
+        interlaced: true,
+        // don't remove IDs from SVGs, they are often used
+        // as hooks for embedding and styling
+        svgoPlugins: [{cleanupIDs: false}]
+      }))
+      .on('error', function (err) {
+        console.log(err);
+        this.end();
+      })))
     .pipe(gulp.dest('dist/images'));
 });
 
 //如果项目中用到了 fonts 用该任务复制字体到dist
 gulp.task('fonts', () => {
   return gulp.src(mainBowerFiles({
-    filter: '**/*.{eot,svg,ttf,woff,woff2}'
-  }).concat('app/fonts/**/*'))
+      filter: '**/*.{eot,svg,ttf,woff,woff2}'
+    }).concat('app/fonts/**/*'))
     .pipe(gulp.dest('.tmp/fonts'))
     .pipe(gulp.dest('dist/fonts'));
 });
